@@ -56,7 +56,8 @@ bool PathInfo::match(const char *path)
     switch (patternType) {
     case prefix:
     {
-        bool ret = (strncmp(path, pattern, strlen(pattern)) == 0);
+        size_t len = strlen(pattern);
+        bool ret = (!strncmp(path, pattern, len) && (path[len] == '\0' || path[len] == '/'));
         if (!warned && ret && (strlen(pattern) != strlen(path))) {
             SLOGW("Deprecated implied prefix pattern detected, please use '%s*' instead", pattern);
             warned = true;
