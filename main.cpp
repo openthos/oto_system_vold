@@ -205,7 +205,6 @@ static int process_config(VolumeManager *vm)
     /* Loop through entries looking for ones that vold manages */
     for (i = 0; i < fstab->num_entries; i++) {
         if (fs_mgr_is_voldmanaged(&fstab->recs[i])) {
-            DirectVolume *dv = NULL;
             flags = 0;
 
             /* Set any flags that might be set for this volume */
@@ -220,9 +219,13 @@ static int process_config(VolumeManager *vm)
                 !strcmp(fstab->recs[i].fs_type, "vfat")) {
                 flags |= VOL_PROVIDES_ASEC;
             }
-            dv = new DirectVolume(vm, &(fstab->recs[i]), flags);
 
-            if (dv->addPath(fstab->recs[i].blk_device)) {
+            bool is_auto = !strcmp(fstab->recs[i].blk_device, "auto");
+            DirectVolume *dv = is_auto ?
+                    new AutoVolume(vm, &(fstab->recs[i]), flags) :
+                    new DirectVolume(vm, &(fstab->recs[i]), flags);
+
+            if (!is_auto && dv->addPath(fstab->recs[i].blk_device)) {
                 SLOGE("Failed to add devpath %s to volume %s",
                       fstab->recs[i].blk_device, fstab->recs[i].label);
                 goto out_fail;
