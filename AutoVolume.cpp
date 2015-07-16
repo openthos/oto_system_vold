@@ -86,7 +86,9 @@ int AutoVolume::handleBlockEvent(NetlinkEvent *evt)
         char p[PATH_MAX];
         const char *dt = evt->findParam("DEVTYPE");
         const char *dp = evt->findParam("DEVPATH");
-        bool isdisk = !strcmp(dt, "disk");
+        const char *dn = evt->findParam("DEVNAME");
+        bool isdisk = !strcmp(dt, "disk") &&
+			strstr(dn, "boot") == 0 && strstr(dn, "rpmb") == 0;
         if (mSdcard) {
             if (const char *d = strrchr(dp, '/')) {
                 int ret = strcmp(++d, mSdcard);
