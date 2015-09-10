@@ -12,6 +12,9 @@ common_src_files := \
 	Process.cpp \
 	Ext4.cpp \
 	Fat.cpp \
+	Ntfs.cpp \
+	Exfat.cpp \
+	F2FS.cpp \
 	Loop.cpp \
 	Devmapper.cpp \
 	ResponseCode.cpp \
@@ -23,6 +26,7 @@ common_src_files := \
 common_c_includes := \
 	system/extras/ext4_utils \
 	system/extras/f2fs_utils \
+	external/e2fsprogs/lib \
 	external/openssl/include \
 	external/stlport/stlport \
 	bionic \
@@ -41,6 +45,7 @@ common_shared_libraries := \
 	libdiskconfig \
 	libhardware_legacy \
 	liblogwrap \
+	libext2_blkid \
 	libext4_utils \
 	libf2fs_sparseblock \
 	libcrypto \
