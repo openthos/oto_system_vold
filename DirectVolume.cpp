@@ -321,6 +321,7 @@ void DirectVolume::handleDiskRemoved(const char * /*devpath*/,
     int minor = atoi(evt->findParam("MINOR"));
     char msg[255];
     bool enabled;
+    int state;
 
     if (mVm->shareEnabled(getLabel(), "ums", &enabled) == 0 && enabled) {
         mVm->unshareVolume(getLabel(), "ums");
@@ -331,6 +332,27 @@ void DirectVolume::handleDiskRemoved(const char * /*devpath*/,
              getLabel(), getFuseMountpoint(), major, minor);
     mVm->getBroadcaster()->sendBroadcast(ResponseCode::VolumeDiskRemoved,
                                              msg, false);
+    state = getState();
+    if (state != Volume::State_Mounted) {
+        return;
+    }
+    if ((dev_t) MKDEV(major, minor) == mCurrentlyMountedKdev) {
+        /*
+         * Yikes, our mounted partition is going away!
+         */
+
+        bool providesAsec = (getFlags() & VOL_PROVIDES_ASEC) != 0;
+        if (providesAsec && mVm->cleanupAsec(this, true)) {
+            SLOGE("Failed to cleanup ASEC - unmount will probably fail!");
+        }
+        if (Volume::unmountVol(true, false)) {
+            SLOGE("Failed to unmount volume on bad removal (%s)", 
+                 strerror(errno));
+            // XXX: At this point we're screwed for now
+        } else {
+            SLOGD("Crisis averted");
+        }
+    }
     setState(Volume::State_NoMedia);
 }
 
