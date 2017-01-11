@@ -719,6 +719,7 @@ int Volume::unmountVol(bool force, bool revert) {
     setUuid(NULL);
     setUserLabel(NULL);
     setState(Volume::State_Idle);
+    setState(Volume::State_NoMedia);
     mCurrentlyMountedKdev = -1;
     return 0;
 
