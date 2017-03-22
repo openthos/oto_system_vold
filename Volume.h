@@ -79,7 +79,7 @@ public:
     int getFlags() { return mFlags; };
 
     /* Mountpoint of the raw volume */
-    virtual const char *getMountpoint() = 0;
+    virtual const char *getMountpoint(int part=0) = 0;
     virtual const char *getFuseMountpoint() = 0;
 
     virtual int handleBlockEvent(NetlinkEvent *evt);

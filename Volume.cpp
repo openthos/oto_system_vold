@@ -359,9 +359,10 @@ bool Volume::isMountpointMounted(const char *path) {
 }
 
 int Volume::mountVol() {
-    dev_t deviceNodes[4];
+    dev_t deviceNodes[16];
     int n, i, rc = 0;
     char errmsg[255];
+    int mpart = 0;
 
     int flags = getFlags();
     bool providesAsec = (flags & VOL_PROVIDES_ASEC) != 0;
@@ -403,7 +404,7 @@ int Volume::mountVol() {
         return 0;
     }
 
-    n = getDeviceNodes((dev_t *) &deviceNodes, 4);
+    n = getDeviceNodes((dev_t *) &deviceNodes, 16);
     if (!n) {
         SLOGE("Failed to get device nodes (%s)\n", strerror(errno));
         return -1;
@@ -451,7 +452,7 @@ int Volume::mountVol() {
         updateDeviceInfo(nodepath, new_major, new_minor);
 
         /* Get the device nodes again, because they just changed */
-        n = getDeviceNodes((dev_t *) &deviceNodes, 4);
+        n = getDeviceNodes((dev_t *) &deviceNodes, 16);
         if (!n) {
             SLOGE("Failed to get device nodes (%s)\n", strerror(errno));
             return -1;
@@ -465,7 +466,7 @@ int Volume::mountVol() {
         sprintf(devicePath, "/dev/block/vold/%d:%d", major(deviceNodes[i]),
                 minor(deviceNodes[i]));
 
-        SLOGI("%s being considered for volume %s\n", devicePath, getLabel());
+        SLOGI("%s being considered for volume %s_%d\n", devicePath, getLabel(), i);
 
         errno = 0;
         setState(Volume::State_Checking);
@@ -482,12 +483,11 @@ int Volume::mountVol() {
                     errno = EIO;
                     /* Badness - abort the mount */
                     SLOGE("%s failed FS checks (%s)", devicePath, strerror(errno));
-                    setState(Volume::State_Idle);
                     free(fstype);
-                    return -1;
+                    continue;
                 }
 
-                if (Fat::doMount(devicePath, getMountpoint(), false, false, false,
+                if (Fat::doMount(devicePath, getMountpoint(i), false, false, false,
                             AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
                     SLOGE("%s failed to mount via VFAT (%s)\n", devicePath, strerror(errno));
                     continue;
@@ -499,19 +499,18 @@ int Volume::mountVol() {
                     errno = EIO;
                     /* Badness - abort the mount */
                     SLOGE("%s failed FS checks (%s)", devicePath, strerror(errno));
-                    setState(Volume::State_Idle);
                     free(fstype);
-                    return -1;
+                    continue;
                 }
 
-                if (Ext4::doMount(devicePath, getMountpoint(), false, false, false, true, mOpts)) {
+                if (Ext4::doMount(devicePath, getMountpoint(i), false, false, false, true, mOpts)) {
                     SLOGE("%s failed to mount via EXT4 (%s)\n", devicePath, strerror(errno));
                     continue;
                 }
 
             } else if (strcmp(fstype, "ntfs") == 0) {
 
-                if (Ntfs::doMount(devicePath, getMountpoint(), false, false, false,
+                if (Ntfs::doMount(devicePath, getMountpoint(i), false, false, false,
                             AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
                     SLOGE("%s failed to mount via NTFS (%s)\n", devicePath, strerror(errno));
                     continue;
@@ -538,7 +537,7 @@ int Volume::mountVol() {
                 }
                 #endif
 
-                if (F2FS::doMount(devicePath, getMountpoint(), false, false, false, true)) {
+                if (F2FS::doMount(devicePath, getMountpoint(i), false, false, false, true)) {
                     SLOGE("%s failed to mount via F2FS (%s)\n", devicePath, strerror(errno));
                     continue;
                 }
@@ -549,12 +548,11 @@ int Volume::mountVol() {
                     errno = EIO;
                     /* Badness - abort the mount */
                     SLOGE("%s failed FS checks (%s)", devicePath, strerror(errno));
-                    setState(Volume::State_Idle);
                     free(fstype);
-                    return -1;
+                    continue;
                 }
 
-                if (Exfat::doMount(devicePath, getMountpoint(), false, false, false,
+                if (Exfat::doMount(devicePath, getMountpoint(i), false, false, false,
                         AID_MEDIA_RW, AID_MEDIA_RW, 0007)) {
                     SLOGE("%s failed to mount via EXFAT (%s)\n", devicePath, strerror(errno));
                     continue;
@@ -563,9 +561,8 @@ int Volume::mountVol() {
             } else {
                 // Unsupported filesystem
                 errno = ENODATA;
-                setState(Volume::State_Idle);
                 free(fstype);
-                return -1;
+		continue;
             }
 
             free(fstype);
@@ -573,26 +570,32 @@ int Volume::mountVol() {
         } else {
             // Unsupported filesystem
             errno = ENODATA;
-            setState(Volume::State_Idle);
             free(fstype);
-            return -1;
+	    continue;
         }
 
         extractMetadata(devicePath);
 
-        if (providesAsec && mountAsecExternal() != 0) {
-            SLOGE("Failed to mount secure area (%s)", strerror(errno));
-            umount(getMountpoint());
-            setState(Volume::State_Idle);
-            return -1;
-        }
+	//count the mounted partition
+	mpart++;
 
+	if(mpart == 1) {
+	    mCurrentlyMountedKdev = deviceNodes[i];
+
+	    if (providesAsec && mountAsecExternal() != 0) {
+		SLOGE("Failed to mount secure area (%s)", strerror(errno));
+		umount(getMountpoint());
+		continue;
+            }
+	}
+    }
+
+    if(mpart > 0){
         char service[64];
         snprintf(service, 64, "fuse_%s", getLabel());
         property_set("ctl.start", service);
 
         setState(Volume::State_Mounted);
-        mCurrentlyMountedKdev = deviceNodes[i];
         return 0;
     }
 
@@ -665,7 +668,8 @@ int Volume::doUnmount(const char *path, bool force) {
 }
 
 int Volume::unmountVol(bool force, bool revert) {
-    int i, rc;
+    int n, i, rc;
+    dev_t deviceNodes[16];
 
     int flags = getFlags();
     bool providesAsec = (flags & VOL_PROVIDES_ASEC) != 0;
@@ -698,13 +702,32 @@ int Volume::unmountVol(bool force, bool revert) {
         goto fail_remount_secure;
     }
 
+    n = getDeviceNodes((dev_t *) &deviceNodes, 16);
+    if (!n) {
+	SLOGE("Failed to get device nodes (%s)\n", strerror(errno));
+    }else{
+	for (i = 1; i < n; i++) {
+		char devicePath[255];
+
+	    sprintf(devicePath, "/dev/block/vold/%d:%d", major(deviceNodes[i]),
+			    minor(deviceNodes[i]));
+
+	    SLOGI("Unmounting the volume (%s)\n", devicePath);
+
+	    if (doUnmount(getMountpoint(i), force) != 0) {
+		    SLOGE("Failed to unmount %s (%s)", devicePath, strerror(errno));
+		    continue;
+	    }
+	}
+    }
+
     /* Unmount the real sd card */
     if (doUnmount(getMountpoint(), force) != 0) {
         SLOGE("Failed to unmount %s (%s)", getMountpoint(), strerror(errno));
         goto fail_remount_secure;
     }
 
-    SLOGI("%s unmounted successfully", getMountpoint());
+    SLOGI("All partition of %s unmounted successfully", getMountpoint());
 
     /* If this is an encrypted volume, and we've been asked to undo
      * the crypto mapping, then revert the dm-crypt mapping, and revert

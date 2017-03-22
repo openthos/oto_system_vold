@@ -59,7 +59,7 @@ public:
 
     int addPath(const char *path);
 
-    const char *getMountpoint() { return mMountpoint; }
+    const char *getMountpoint(int part=0);
     const char *getFuseMountpoint() { return mFuseMountpoint; }
 
     int handleBlockEvent(NetlinkEvent *evt);
