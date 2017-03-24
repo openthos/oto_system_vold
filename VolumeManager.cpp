@@ -96,10 +96,6 @@ static const char* kPropVirtualDisk = "persist.sys.virtual_disk";
 /* 512MiB is large enough for testing purposes */
 static const unsigned int kSizeVirtualDisk = 536870912;
 
-static const unsigned int kMajorBlockMmc = 179;
-static const unsigned int kMajorBlockExperimentalMin = 240;
-static const unsigned int kMajorBlockExperimentalMax = 254;
-
 /* writes superblock at end of file or device given by name */
 static int writeSuperBlock(const char* name, struct asec_superblock *sb, unsigned int numImgSectors) {
     int sbfd = open(name, O_RDWR | O_CLOEXEC);
@@ -360,10 +356,8 @@ void VolumeManager::handleBlockEvent(NetlinkEvent *evt) {
                 // emulator-specific; see Disk.cpp for details) devices are SD,
                 // and that everything else is USB
                 int flags = source->getFlags();
-                if (major == kMajorBlockMmc
-                    || (android::vold::IsRunningInEmulator()
-                    && major >= (int) kMajorBlockExperimentalMin
-                    && major <= (int) kMajorBlockExperimentalMax)) {
+                if (major == android::vold::Disk::kMajorBlockMmc
+                        || android::vold::Disk::isVirtioBlkDevice(major)) {
                     flags |= android::vold::Disk::Flags::kSd;
                 } else {
                     flags |= android::vold::Disk::Flags::kUsb;
