@@ -254,9 +254,9 @@ int Volume::createDeviceNode(const char *path, int major, int minor) {
 }
 
 int Volume::formatVol(bool wipe) {
-
+    setState(Volume::State_Idle);
     char* fstype = NULL;
-
+#if 0
     if (getState() == Volume::State_NoMedia) {
         errno = ENODEV;
         return -1;
@@ -264,7 +264,7 @@ int Volume::formatVol(bool wipe) {
         errno = EBUSY;
         return -1;
     }
-
+#endif
     if (isMountpointMounted(getMountpoint())) {
         SLOGW("Volume is idle but appears to be mounted - fixing");
         setState(Volume::State_Mounted);
