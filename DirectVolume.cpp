@@ -524,18 +524,12 @@ int DirectVolume::getVolInfo(struct volume_info *v)
     return 0;
 }
 
-const char * DirectVolume::getMountpoint(int part)
+void DirectVolume::getMountpoint(int part, char buffer[])
 {
-    if(part == 0){
-        return mMountpoint;
-    }
+    if (part)
+        snprintf(buffer, PATH_MAX, "%s_%d", mFuseMountpoint, part);
+    else
+        strcpy(buffer, mMountpoint);
 
-    int i;
-    char mMountpoint_node[128]={0};
-
-    sprintf(mMountpoint_node,"%s_%d", mFuseMountpoint, part);
-
-    SLOGD("DirectVolume::getMountpoint() return a partition mountpoint:(%s)", mMountpoint_node);
-
-    return mMountpoint_node;
+    SLOGD("DirectVolume::getMountpoint() return a partition mountpoint:(%s)", buffer);
 }

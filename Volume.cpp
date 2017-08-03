@@ -462,7 +462,9 @@ int Volume::mountVol() {
     for (i = 0; i < n; i++) {
         char devicePath[255];
         char *fstype = NULL;
+        char mountpoint[PATH_MAX];
 
+        getMountpoint(i, mountpoint);
         sprintf(devicePath, "/dev/block/vold/%d:%d", major(deviceNodes[i]),
                 minor(deviceNodes[i]));
 
@@ -487,7 +489,7 @@ int Volume::mountVol() {
                     continue;
                 }
 
-                if (Fat::doMount(devicePath, getMountpoint(i), false, false, false,
+                if (Fat::doMount(devicePath, mountpoint, false, false, false,
                             AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
                     SLOGE("%s failed to mount via VFAT (%s)\n", devicePath, strerror(errno));
                     continue;
@@ -503,14 +505,14 @@ int Volume::mountVol() {
                     continue;
                 }
 
-                if (Ext4::doMount(devicePath, getMountpoint(i), false, false, false, true, mOpts)) {
+                if (Ext4::doMount(devicePath, mountpoint, false, false, false, true, mOpts)) {
                     SLOGE("%s failed to mount via EXT4 (%s)\n", devicePath, strerror(errno));
                     continue;
                 }
 
             } else if (strcmp(fstype, "ntfs") == 0) {
 
-                if (Ntfs::doMount(devicePath, getMountpoint(i), false, false, false,
+                if (Ntfs::doMount(devicePath, mountpoint, false, false, false,
                             AID_MEDIA_RW, AID_MEDIA_RW, 0007, true)) {
                     SLOGE("%s failed to mount via NTFS (%s)\n", devicePath, strerror(errno));
                     continue;
@@ -537,7 +539,7 @@ int Volume::mountVol() {
                 }
                 #endif
 
-                if (F2FS::doMount(devicePath, getMountpoint(i), false, false, false, true)) {
+                if (F2FS::doMount(devicePath, mountpoint, false, false, false, true)) {
                     SLOGE("%s failed to mount via F2FS (%s)\n", devicePath, strerror(errno));
                     continue;
                 }
@@ -552,7 +554,7 @@ int Volume::mountVol() {
                     continue;
                 }
 
-                if (Exfat::doMount(devicePath, getMountpoint(i), false, false, false,
+                if (Exfat::doMount(devicePath, mountpoint, false, false, false,
                         AID_MEDIA_RW, AID_MEDIA_RW, 0007)) {
                     SLOGE("%s failed to mount via EXFAT (%s)\n", devicePath, strerror(errno));
                     continue;
@@ -706,6 +708,7 @@ int Volume::unmountVol(bool force, bool revert) {
     if (!n) {
 	SLOGE("Failed to get device nodes (%s)\n", strerror(errno));
     }else{
+	char mountpoint[PATH_MAX];
 	for (i = 1; i < n; i++) {
 		char devicePath[255];
 
@@ -714,7 +717,8 @@ int Volume::unmountVol(bool force, bool revert) {
 
 	    SLOGI("Unmounting the volume (%s)\n", devicePath);
 
-	    if (doUnmount(getMountpoint(i), force) != 0) {
+	    getMountpoint(i, mountpoint);
+	    if (doUnmount(mountpoint, force) != 0) {
 		    SLOGE("Failed to unmount %s (%s)", devicePath, strerror(errno));
 		    continue;
 	    }
